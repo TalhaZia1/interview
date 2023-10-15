@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <net/if.h>  // For struct ifreq
 
 
 #include <getopt.h>
@@ -63,8 +64,8 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	// Interface to be used. Currently hardcoded to vcan0
-	struct ifreq ifr = { .ifr_name = "vcan0"};
+	struct ifreq ifr;
+	strncpy(ifr.ifr_name, can_interface, IFNAMSIZ - 1);
 	ioctl(s, SIOCGIFINDEX, &ifr);
 
 	struct sockaddr_can addr;
