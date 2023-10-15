@@ -130,49 +130,58 @@ int main(int argc, char *argv[]) {
 			usleep(sleep_time);
 		} else if((frame.data[0] == 0xB0)) {
 			if (frame.can_dlc == 2) {
-				uint8_t const len = frame.data[1];
-				uint8_t const Fizz = 0xFF;
-				uint8_t const Buzz = 0xBB;
-				uint8_t const FizzBuzz = 0xFB;
+				if ((0x00 <= frame.data[1]) && (frame.data[1]  <= 0x80)) {
+					uint8_t const data_len = frame.data[1] + 1;
+					uint8_t const Fizz = 0xFF;
+					uint8_t const Buzz = 0xBB;
+					uint8_t const FizzBuzz = 0xFB;
 
-				/* <byte0> == CAN-ID B1 <byte1> <byte2>...<byte7> == Data*/
-				uint8_t const totalFrames = (len / 7) + 1;
-				uint8_t const lastFramelen = (len % 7) + 1;
-				
-				struct can_frame reply_frame[totalFrames];
+					/* Deciding Number of frames + data bytes in last frame */
+					uint8_t const lastDataFrameBytes = (data_len % 7);
+					uint8_t const dataFrames = (lastDataFrameBytes == 0) ? (data_len / 7) : (data_len / 7) + 1;
+					struct can_frame reply_frame[dataFrames];
 
-				for (uint8_t frame = 0; frame < totalFrames; frame++) {
-					reply_frame[frame].can_id = can_id;
-					reply_frame[frame].can_dlc = ((frame+1) == totalFrames) ? lastFramelen : CAN_MAX_DLEN;
-					reply_frame[frame].data[0] = 0xB1;
-					
-					for (uint8_t i = 0; i<reply_frame[frame].can_dlc; i++) {
-						uint8_t param = i + frame * 7; 
-						if (param == 0) {
-							reply_frame[frame].data[i+1] = param;
-						} else if (param % 3 == 0 && param % 5 == 0) {
-            				reply_frame[frame].data[i+1] = FizzBuzz;
-        				} else if (param % 3 == 0) {
-            				reply_frame[frame].data[i+1] = Fizz;
-        				} else if (param % 5 == 0) {
-            				reply_frame[frame].data[i+1] = Buzz;
-        				} else {
-            				reply_frame[frame].data[i+1] = param;
-        				}
+					for (uint8_t f = 0; f < dataFrames; f++) {
+						/* Default Frame Setup */
+						reply_frame[f].can_id = can_id;
+						reply_frame[f].can_dlc = CAN_MAX_DLEN;
+						reply_frame[f].data[0] = 0xB1;
+
+						/* Populating remaining elements */
+						bool isLastFrame = ((f+1) == dataFrames); 
+						if (isLastFrame) {
+							reply_frame[f].can_dlc = (lastDataFrameBytes != 0) ? lastDataFrameBytes + 1 : CAN_MAX_DLEN;
+						}
+						for (uint8_t i = 1; i < (reply_frame[f].can_dlc); i++) {
+							uint8_t param = i + (f * 7) - 1; 
+							if (param == 0) {
+								reply_frame[f].data[i] = param;
+							} else if ((param % 3 == 0) && (param % 5 == 0)) {
+            					reply_frame[f].data[i] = FizzBuzz;
+        					} else if (param % 3 == 0) {
+            					reply_frame[f].data[i] = Fizz;
+        					} else if (param % 5 == 0) {
+            					reply_frame[f].data[i] = Buzz;
+        					} else {
+            					reply_frame[f].data[i] = param;
+        					}
+						}
+
+						/* Send Frame */
+						if (write(s, &reply_frame[f], sizeof(struct can_frame)) != sizeof(struct can_frame)) {
+							perror("Socker write failed");
+							return -1;
+						}
+						usleep(sleep_time);
 					}
-					if (write(s, &reply_frame[frame], sizeof(struct can_frame)) != sizeof(struct can_frame)) {
-						perror("Socker write failed");
-						return -1;
-					}
-					usleep(sleep_time);
+				} else {
+					/* Case in which user entered only B0 out of range */
 				}
 			} else {
 				/* Case in which user entered only B0 --> XX is missing */
-				printf("ERROR: Not Implemented\n");
-			}
-			usleep(sleep_time);
+			} 
 		} else {
-			printf("ERROR: Not Implemented\n");
+			/* Unknown Command */
 		}
 	} 
 	while(1);
