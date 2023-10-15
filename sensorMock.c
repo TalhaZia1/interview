@@ -6,6 +6,7 @@
 #include <string.h>
 #include <net/if.h>  // For struct ifreq
 #include <stdint.h>
+#include <stdbool.h>
 
 
 #include <getopt.h>
@@ -129,12 +130,42 @@ int main(int argc, char *argv[]) {
 			usleep(sleep_time);
 		} else if((frame.data[0] == 0xB0)) {
 			if (frame.can_dlc == 2) {
-				/* Making sure that user enters B0XX */
-				printf("Todo: Inprogress\n");
-				//uint8_t len = frame.data[1];
-				//uint8_t const Fizz = 0xFF;
-				//uint8_t const Buzz = 0xBB;
-				//uint8_t const FizzBuzz = 0xFB;
+				uint8_t const len = frame.data[1];
+				uint8_t const Fizz = 0xFF;
+				uint8_t const Buzz = 0xBB;
+				uint8_t const FizzBuzz = 0xFB;
+
+				/* <byte0> == CAN-ID B1 <byte1> <byte2>...<byte7> == Data*/
+				uint8_t const totalFrames = (len / 7) + 1;
+				uint8_t const lastFramelen = (len % 7) + 1;
+				
+				struct can_frame reply_frame[totalFrames];
+
+				for (uint8_t frame = 0; frame < totalFrames; frame++) {
+					reply_frame[frame].can_id = can_id;
+					reply_frame[frame].can_dlc = ((frame+1) == totalFrames) ? lastFramelen : CAN_MAX_DLEN;
+					reply_frame[frame].data[0] = 0xB1;
+					
+					for (uint8_t i = 0; i<reply_frame[frame].can_dlc; i++) {
+						uint8_t param = i + frame * 7; 
+						if (param == 0) {
+							reply_frame[frame].data[i+1] = param;
+						} else if (param % 3 == 0 && param % 5 == 0) {
+            				reply_frame[frame].data[i+1] = FizzBuzz;
+        				} else if (param % 3 == 0) {
+            				reply_frame[frame].data[i+1] = Fizz;
+        				} else if (param % 5 == 0) {
+            				reply_frame[frame].data[i+1] = Buzz;
+        				} else {
+            				reply_frame[frame].data[i+1] = param;
+        				}
+					}
+					if (write(s, &reply_frame[frame], sizeof(struct can_frame)) != sizeof(struct can_frame)) {
+						perror("Socker write failed");
+						return -1;
+					}
+					usleep(sleep_time);
+				}
 			} else {
 				/* Case in which user entered only B0 --> XX is missing */
 				printf("ERROR: Not Implemented\n");
