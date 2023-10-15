@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <net/if.h>  // For struct ifreq
+#include <stdint.h>
 
 
 #include <getopt.h>
@@ -79,12 +80,14 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	//Addresses to respond to. 000 is used as broadcast
-	struct can_filter rfilter[2];
+	//Addresses to respond to. 000 is used as broadcast and hardcoded 333
+	struct can_filter rfilter[3];
 	rfilter[0].can_id   = can_id;
 	rfilter[0].can_mask = 0xFFF;
 	rfilter[1].can_id   = 0x000;
 	rfilter[1].can_mask = 0xFFF;
+	rfilter[2].can_id   = 0x333;
+	rfilter[2].can_mask = 0xFFF;
 
 	setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &rfilter, sizeof(rfilter));
 
@@ -124,8 +127,22 @@ int main(int argc, char *argv[]) {
 				return -1;
 			}
 			usleep(sleep_time);
+		} else if((frame.data[0] == 0xB0)) {
+			if (frame.can_dlc == 2) {
+				/* Making sure that user enters B0XX */
+				printf("Todo: Inprogress\n");
+				//uint8_t len = frame.data[1];
+				//uint8_t const Fizz = 0xFF;
+				//uint8_t const Buzz = 0xBB;
+				//uint8_t const FizzBuzz = 0xFB;
+			} else {
+				/* Case in which user entered only B0 --> XX is missing */
+				printf("ERROR: Not Implemented\n");
+			}
+			usleep(sleep_time);
+		} else {
+			printf("ERROR: Not Implemented\n");
 		}
-
 	} 
 	while(1);
 	
